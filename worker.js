@@ -208,6 +208,9 @@ const HTML = `<!DOCTYPE html>
       <div class="nav-row">
         <div class="nav-large">Accountable</div>
         <div style="display:flex;gap:2px">
+          <button class="icon-btn" title="View a partner's list" onclick="openSheet('sh-join')">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          </button>
           <button class="icon-btn" title="New list" onclick="openSheet('sh-new-list')">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
           </button>
@@ -225,6 +228,9 @@ const HTML = `<!DOCTYPE html>
         Lists
       </button>
       <div class="nav-center" id="todo-title"></div>
+      <div class="nav-actions">
+        <button class="txt-btn" id="share-btn" onclick="openShareSheet()">Share</button>
+      </div>
     </div>
     <div class="scroll" id="todos-scroll"></div>
     <div class="input-bar">
@@ -233,6 +239,21 @@ const HTML = `<!DOCTYPE html>
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"><line x1="9" y1="3" x2="9" y2="15"/><line x1="3" y1="9" x2="15" y2="9"/></svg>
       </button>
     </div>
+  </div>
+
+  <!-- SHARED VIEW -->
+  <div class="screen" id="screen-shared">
+    <div class="nav white">
+      <button class="nav-back" onclick="goBack()">
+        <svg width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1L1.5 7.5L8 14"/></svg>
+        Back
+      </button>
+      <div class="nav-center" id="shared-title">Partner's List</div>
+      <div class="nav-actions">
+        <button class="txt-btn" onclick="refreshShared()">Refresh</button>
+      </div>
+    </div>
+    <div class="scroll" id="shared-scroll"></div>
   </div>
 </div>
 
@@ -245,6 +266,24 @@ const HTML = `<!DOCTYPE html>
     <input class="sin" id="new-list-input" placeholder="e.g. Morning Routine" maxlength="40"/>
     <button class="sbtn primary" onclick="createList()">Create</button>
     <button class="sbtn ghost" onclick="closeSheet('sh-new-list')">Cancel</button>
+  </div>
+</div>
+
+<div class="overlay" id="sh-join" onclick="bgClose(event,'sh-join')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="handle"></div>
+    <div class="stitle">View a Shared List</div>
+    <div class="ssub">Enter the 6-character code from your accountability partner.</div>
+    <input class="sin code" id="join-input" placeholder="AB12CD" maxlength="6" autocomplete="off"/>
+    <button class="sbtn purple" id="join-btn" onclick="joinList()">View List</button>
+    <button class="sbtn ghost" onclick="closeSheet('sh-join')">Cancel</button>
+  </div>
+</div>
+
+<div class="overlay" id="sh-share" onclick="bgClose(event,'sh-share')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="handle"></div>
+    <div id="share-content"></div>
   </div>
 </div>
 
@@ -264,32 +303,44 @@ const HTML = `<!DOCTYPE html>
 const CHEVRON = '<svg width="8" height="13" viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1l6 5.5L1 12"/></svg>';
 const CHECK_SVG = '<svg width="13" height="10" viewBox="0 0 13 10" fill="none"><path d="M1 4.5L4.5 8.5L12 1" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const ICON_LIST = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>';
+const ICON_LINK = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
 const ICON_CLOSE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" fill="currentColor" opacity="0.12"/><path d="M9 9l6 6M15 9l-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const ICON_EMPTY_LIST = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>';
 const ICON_EMPTY_TASK = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="9 12 11 14 15 10"/></svg>';
+const ICON_EMPTY_SHARE = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>';
 
 // Data
 const KEY = 'accountable_v3';
 function loadOwn() { try { return JSON.parse(localStorage.getItem(KEY)) || {lists:[]}; } catch { return {lists:[]}; } }
 function saveOwn(d) { localStorage.setItem(KEY, JSON.stringify(d)); }
+async function fetchShared(code) {
+  try { const r = await fetch('/api/shared/'+code.toUpperCase()); return r.ok ? r.json() : null; }
+  catch { return null; }
+}
+async function pushShared(code, data) {
+  try { await fetch('/api/shared/'+code.toUpperCase(), {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}); }
+  catch {}
+}
 
 let db = loadOwn();
-let listId = null, navStack = [];
+let listId = null, viewCode = null, navStack = [];
 function uid() { return Math.random().toString(36).slice(2,10); }
 function makeCode() { return Math.random().toString(36).slice(2,8).toUpperCase(); }
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-const COLORS = ['#007aff','#34c759','#ff9500','#ff3b30','#af52de','#ff2d55','#32ade6','#30b0c7'];
 
 // Nav
 function showScreen(id) { document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById('screen-'+id).classList.add('active'); }
 function nav(id) { navStack.push(document.querySelector('.screen.active').id.replace('screen-','')); showScreen(id); }
 function goBack() { showScreen(navStack.pop()||'lists'); }
 
+// List colors
+const COLORS = ['#007aff','#34c759','#ff9500','#ff3b30','#af52de','#ff2d55','#32ade6','#30b0c7'];
+
 // Render lists
 function renderLists() {
   const el = document.getElementById('lists-scroll');
   if (!db.lists.length) {
-    el.innerHTML = \`<div class="empty"><div class="empty-ico">\${ICON_EMPTY_LIST}</div><div class="empty-t">No Lists Yet</div><div class="empty-s">Tap + to create your first list.</div></div>\`;
+    el.innerHTML = \`<div class="empty"><div class="empty-ico">\${ICON_EMPTY_LIST}</div><div class="empty-t">No Lists Yet</div><div class="empty-s">Tap the + button above to create your first accountability list.</div></div>\`;
     return;
   }
   let h = '<div class="sh">My Lists</div><div class="group">';
@@ -297,39 +348,68 @@ function renderLists() {
     const rem = list.items.filter(i=>!i.done).length, tot = list.items.length;
     h += \`<div class="row" onclick="openList('\${list.id}')">
       <div class="list-icon" style="background:\${list.color}18;color:\${list.color}">\${ICON_LIST}</div>
-      <div class="rc"><div class="rt">\${esc(list.name)}</div>\${tot>0?\`<div class="rs">\${rem} remaining</div>\`:''}</div>
-      <div class="ra">\${tot>0?\`<span class="badge\${rem===0?' done':''}">\${rem>0?rem:'&#10003;'}</span>\`:''}<span class="chev">\${CHEVRON}</span></div>
+      <div class="rc">
+        <div class="rt">\${esc(list.name)}</div>
+        \${list.shareCode
+          ? \`<div class="rs" style="color:var(--purple)">Sharing active &middot; \${list.items.filter(i=>i.shared).length} visible</div>\`
+          : (tot>0 ? \`<div class="rs">\${rem} remaining</div>\` : '')
+        }
+      </div>
+      <div class="ra">
+        \${tot>0?\`<span class="badge\${rem===0?' done':''}">\${rem>0?rem:'&#10003;'}</span>\`:''}
+        <span class="chev">\${CHEVRON}</span>
+      </div>
     </div>\`;
   });
-  h += '</div><div style="height:32px"></div>';
+  h += \`</div><div class="sh">Partners</div><div class="group">
+    <div class="row" onclick="openSheet('sh-join')">
+      <div class="list-icon" style="background:var(--purple-soft);color:var(--purple)">\${ICON_LINK}</div>
+      <div class="rc"><div class="rt">View a Shared List</div><div class="rs">Enter a partner's code</div></div>
+      <span class="chev">\${CHEVRON}</span>
+    </div>
+  </div><div style="height:32px"></div>\`;
   el.innerHTML = h;
 }
 
 function openList(id) { listId = id; nav('todos'); renderTodos(); }
 function getList() { return db.lists.find(l=>l.id===listId); }
-function persist(fn) { db.lists = db.lists.map(l=>l.id===listId?fn(l):l); saveOwn(db); }
+function persist(fn) {
+  db.lists = db.lists.map(l=>l.id===listId?fn(l):l);
+  saveOwn(db);
+  const list = getList();
+  if (list?.shareCode) pushShared(list.shareCode, {name:list.name, items:list.items.filter(i=>i.shared), updatedAt:Date.now()});
+}
 
 function renderTodos() {
   const list = getList(); if (!list) return;
   document.getElementById('todo-title').textContent = list.name;
+  const btn = document.getElementById('share-btn');
+  btn.textContent = list.shareCode || 'Share';
+  btn.className = 'txt-btn' + (list.shareCode?' purple':'');
+
   const el = document.getElementById('todos-scroll');
   if (!list.items.length) {
-    el.innerHTML = \`<div class="empty"><div class="empty-ico">\${ICON_EMPTY_TASK}</div><div class="empty-t">No Tasks</div><div class="empty-s">Add your first task below.</div></div>\`;
+    el.innerHTML = \`<div class="empty"><div class="empty-ico">\${ICON_EMPTY_TASK}</div><div class="empty-t">No Tasks</div><div class="empty-s">Add your first task using the input below.</div></div>\`;
     return;
   }
   const done = list.items.filter(i=>i.done).length, tot = list.items.length;
-  let h = \`<div class="prog"><div class="prog-lbl">\${done} of \${tot} completed</div><div class="prog-track"><div class="prog-fill" style="width:\${Math.round(done/tot*100)}%"></div></div></div>\`;
+  let h = \`<div class="prog"><div class="prog-lbl">\${done} of \${tot} completed</div><div class="prog-track"><div class="prog-fill" style="width:\${tot?Math.round(done/tot*100):0}%"></div></div></div>\`;
+  if (list.shareCode) {
+    const sc = list.items.filter(i=>i.shared).length;
+    h += \`<div class="info purple" style="margin:0 16px 8px">Sharing \${sc} task\${sc!==1?'s':''} with your partner.</div>\`;
+  }
   const active = list.items.filter(i=>!i.done), comp = list.items.filter(i=>i.done);
-  if (active.length) { h+='<div class="sh">To Do</div><div class="group">'; active.forEach(i=>{h+=trow(i);}); h+='</div>'; }
-  if (comp.length)   { h+='<div class="sh">Completed</div><div class="group">'; comp.forEach(i=>{h+=trow(i);}); h+='</div>'; }
-  h+=\`<div style="padding:8px 16px 0"><button class="sbtn danger" onclick="openDeleteSheet()">Delete List</button></div><div style="height:16px"></div>\`;
+  if (active.length) { h+='<div class="sh">To Do</div><div class="group">'; active.forEach(i=>{h+=trow(i,!!list.shareCode);}); h+='</div>'; }
+  if (comp.length)   { h+='<div class="sh">Completed</div><div class="group">'; comp.forEach(i=>{h+=trow(i,!!list.shareCode);}); h+='</div>'; }
+  h+=\`<div style="padding:8px 16px 0"><button class="sbtn danger" onclick="openDeleteSheet()" style="margin-bottom:0">Delete List</button></div><div style="height:16px"></div>\`;
   el.innerHTML = h;
 }
 
-function trow(item) {
+function trow(item, hasShare) {
   return \`<div class="ti">
     <div class="check\${item.done?' done':''}" onclick="toggleTodo('\${item.id}')">\${CHECK_SVG}</div>
     <div class="tt\${item.done?' done':''}">\${esc(item.text)}</div>
+    \${hasShare?\`<button class="pill\${item.shared?' on':''}" onclick="toggleShare('\${item.id}')">\${item.shared?'Shared':'Share'}</button>\`:''}
     <button class="del" onclick="delTodo('\${item.id}')">\${ICON_CLOSE}</button>
   </div>\`;
 }
@@ -337,10 +417,45 @@ function trow(item) {
 function addTodo() {
   const inp = document.getElementById('task-input'), text = inp.value.trim(); if (!text) return;
   persist(l=>({...l, items:[...l.items, {id:uid(),text,done:false,shared:false}]}));
-  inp.value=''; renderTodos(); renderLists();
+  inp.value=''; renderTodos(); showToast('Task added');
 }
-function toggleTodo(id) { persist(l=>({...l,items:l.items.map(i=>i.id===id?{...i,done:!i.done}:i)})); renderTodos(); renderLists(); }
-function delTodo(id)    { persist(l=>({...l,items:l.items.filter(i=>i.id!==id)})); renderTodos(); renderLists(); }
+function toggleTodo(id) { persist(l=>({...l,items:l.items.map(i=>i.id===id?{...i,done:!i.done}:i)})); renderTodos(); }
+function delTodo(id)    { persist(l=>({...l,items:l.items.filter(i=>i.id!==id)})); renderTodos(); }
+function toggleShare(id){ persist(l=>({...l,items:l.items.map(i=>i.id===id?{...i,shared:!i.shared}:i)})); renderTodos(); }
+
+function openShareSheet() {
+  const list = getList(); if (!list) return;
+  const el = document.getElementById('share-content');
+  if (list.shareCode) {
+    const shared = list.items.filter(i=>i.shared);
+    const itemsH = shared.length
+      ? shared.map(i=>\`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:0.5px solid var(--sep)">
+          <div style="width:22px;height:22px;border-radius:50%;background:\${i.done?'var(--green)':'transparent'};border:2px solid \${i.done?'var(--green)':'var(--bg2)'};display:flex;align-items:center;justify-content:center;flex-shrink:0">\${i.done?CHECK_SVG:''}</div>
+          <span style="font-size:15px;color:\${i.done?'var(--label3)':'var(--label)'}\${i.done?';text-decoration:line-through':''}">\${esc(i.text)}</span>
+        </div>\`).join('')
+      : \`<p style="color:var(--label3);font-size:14px;padding:10px 0">No tasks shared yet. Tap <strong>Share</strong> on a task to make it visible to your partner.</p>\`;
+    el.innerHTML = \`<div class="stitle">"\${esc(list.name)}"</div>
+      <div class="code-card"><div class="code-lbl">Share Code</div><div class="code-val">\${list.shareCode}</div><button class="code-copy" onclick="copyCode('\${list.shareCode}')">Copy Code</button></div>
+      <div class="info purple">Your partner enters this code to view your shared tasks in real time, from any device.</div>
+      <div class="sh" style="padding:0 0 8px">Currently Sharing (\${shared.length})</div>
+      <div style="margin-bottom:16px">\${itemsH}</div>
+      <button class="sbtn ghost" onclick="disableSharing()">Stop Sharing</button>
+      <button class="sbtn ghost" onclick="closeSheet('sh-share')">Done</button>\`;
+  } else {
+    el.innerHTML = \`<div class="stitle">Share This List</div>
+      <div class="ssub">Generate a code and give it to your accountability partner. They see only the tasks you choose to share — from any device.</div>
+      <div class="info blue">Your partner can view your progress in real time but cannot edit anything.</div>
+      <button class="sbtn primary" onclick="enableSharing()">Enable Sharing</button>
+      <button class="sbtn ghost" onclick="closeSheet('sh-share')">Cancel</button>\`;
+  }
+  openSheet('sh-share');
+}
+
+function enableSharing() { const code=makeCode(); persist(l=>({...l,shareCode:code})); renderTodos(); closeSheet('sh-share'); setTimeout(openShareSheet,60); }
+function disableSharing() { persist(l=>({...l,shareCode:null})); renderTodos(); closeSheet('sh-share'); showToast('Sharing disabled'); }
+function copyCode(code) {
+  (navigator.clipboard?.writeText(code)||Promise.reject()).then(()=>showToast('Code copied!')).catch(()=>showToast('Code: '+code));
+}
 
 function createList() {
   const name = document.getElementById('new-list-input').value.trim(); if (!name) return;
@@ -361,8 +476,57 @@ function confirmDelete() {
   closeSheet('sh-delete'); renderLists(); goBack();
 }
 
+async function joinList() {
+  const code=document.getElementById('join-input').value.trim().toUpperCase();
+  if (code.length<4) { showToast('Enter a valid code'); return; }
+  const btn=document.getElementById('join-btn');
+  btn.textContent='Loading\u2026'; btn.disabled=true;
+  const data=await fetchShared(code);
+  btn.textContent='View List'; btn.disabled=false;
+  if (!data) { showToast('No list found \u2014 check the code'); return; }
+  viewCode=code;
+  document.getElementById('join-input').value='';
+  closeSheet('sh-join'); nav('shared'); renderSharedView(data);
+}
+
+function renderSharedView(data) {
+  document.getElementById('shared-title').textContent = data.name||'Shared List';
+  const el=document.getElementById('shared-scroll'), items=data.items||[];
+  if (!items.length) {
+    el.innerHTML=\`<div class="empty"><div class="empty-ico">\${ICON_EMPTY_SHARE}</div><div class="empty-t">Nothing Shared Yet</div><div class="empty-s">Your partner hasn't shared any tasks yet.</div></div>\`;
+    return;
+  }
+  const done=items.filter(i=>i.done).length;
+  const updated=data.updatedAt?new Date(data.updatedAt).toLocaleString([],{dateStyle:'short',timeStyle:'short'}):null;
+  let h=\`<div class="prog">\${updated?'<div class="prog-lbl" style="text-align:right;margin-bottom:4px">Updated '+updated+'</div>':''}
+    <div class="prog-lbl">\${done} of \${items.length} completed</div>
+    <div class="prog-track"><div class="prog-fill" style="width:\${Math.round(done/items.length*100)}%"></div></div>
+  </div>
+  <div class="info purple" style="margin:0 16px 8px">Tap Refresh to check for updates from your partner.</div>
+  <div class="sh">Tasks (\${items.length})</div><div class="group">\`;
+  items.forEach(item=>{
+    h+=\`<div class="sitem">
+      <div style="width:24px;height:24px;border-radius:50%;background:\${item.done?'var(--green)':'transparent'};border:2px solid \${item.done?'var(--green)':'var(--bg2)'};display:flex;align-items:center;justify-content:center;flex-shrink:0">\${item.done?CHECK_SVG:''}</div>
+      <div style="font-size:17px;letter-spacing:-0.2px;color:\${item.done?'var(--label3)':'var(--label)'}\${item.done?';text-decoration:line-through':''}">\${esc(item.text)}</div>
+    </div>\`;
+  });
+  h+=\`</div><div style="height:32px"></div>\`;
+  el.innerHTML=h;
+}
+
+async function refreshShared() {
+  if (!viewCode) return; showToast('Refreshing\u2026');
+  const data=await fetchShared(viewCode);
+  if (data) { renderSharedView(data); showToast('Updated'); }
+  else showToast('Could not load list');
+}
+
 // Sheets
-function openSheet(id) { const el=document.getElementById(id); el.style.display='flex'; requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add('open'))); setTimeout(()=>{ const i=el.querySelector('input'); if(i) i.focus(); },340); }
+function openSheet(id) {
+  const el=document.getElementById(id); el.style.display='flex';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add('open')));
+  setTimeout(()=>{ const i=el.querySelector('input'); if(i) i.focus(); }, 340);
+}
 function closeSheet(id) { const el=document.getElementById(id); el.classList.remove('open'); setTimeout(()=>el.style.display='none',340); }
 function bgClose(e,id) { if(e.target===e.currentTarget) closeSheet(id); }
 document.querySelectorAll('.overlay').forEach(s=>s.style.display='none');
@@ -371,10 +535,13 @@ document.querySelectorAll('.overlay').forEach(s=>s.style.display='none');
 let _t;
 function showToast(msg) { const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(_t); _t=setTimeout(()=>t.classList.remove('show'),2200); }
 
+// Keyboard
 document.getElementById('task-input').addEventListener('keydown',e=>{if(e.key==='Enter')addTodo();});
 document.getElementById('new-list-input').addEventListener('keydown',e=>{if(e.key==='Enter')createList();});
+document.getElementById('join-input').addEventListener('keydown',e=>{if(e.key==='Enter')joinList();});
+document.getElementById('join-input').addEventListener('input',e=>{e.target.value=e.target.value.toUpperCase();});
 
 renderLists();
 </script>
 </body>
-</html>\`;
+</html>`;
